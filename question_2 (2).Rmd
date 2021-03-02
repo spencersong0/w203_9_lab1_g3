@@ -1,0 +1,118 @@
+---
+title: 'Lab 1:  Question 2'
+author: "Spencer Song, Spencer Hong, Andy Tertzakian, Kevin Xuan, Kevin Lu"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+<!-- # load packages and data -->
+```{r load packages, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2) 
+library(tidyverse)
+library(foreign)
+data <- read.spss("anes_timeseries_2020_spss_20210211.sav")
+```
+
+<!-- #### Data Extraction & Transformation -->
+```{r load and clean data, echo=FALSE, warning=TRUE, message=FALSE}
+# For the research question, the following variables will help answer it.
+# Variables: 
+# V201018: Party of registration  EX: Democrat, Republican, ...
+# V201151: Feeling Thermometer for Joe Biden (range from 0 to 100 )  EX: 50 
+# V201153: Feeling Thermometer for Kamala Harris (range from 0 to 100) EX: 55
+df <- data.frame(data$V201018, data$V201151, data$V201153)
+
+# Rename each variable
+df <- rename(df, 
+             party_type = data.V201018,
+             enthusiasm_Biden = data.V201151,
+             enthusiasm_Harris = data.V201153
+)
+
+# Since we are interested only in Democrat voters, we filter out voters of other parties
+df <- subset(df, party_type == '1. Democratic party')
+# change variable "party_type" to string data type
+df$party_type <- as.character(df$party_type)
+# rename values in party_type --> "1. Democratic party" to "Democratic"
+df$party_type[df$party_type == '1. Democratic party'] <- "Democratic"
+# change variable "enthusiasm_Biden" to numeric data type
+df$enthusiasm_Biden <- suppressWarnings(as.numeric(as.character(df$enthusiasm_Biden)))
+# change variable "enthusiasm_Harris" to numeric data type
+df$enthusiasm_Harris <- suppressWarnings(as.numeric(as.character(df$enthusiasm_Harris)))
+```
+
+
+```{r Data Cleaning, echo=FALSE, warning=TRUE, message=FALSE}
+# check number of missing values in the data
+#paste("Number of missing values in the data:",sum(is.na(df)))
+# There are some missing values under variables "enthusiasm_Biden" and "enthusiasm_Harris"
+# Remove missing values in the data
+df <- na.omit(df)
+#paste("Number of missing values after cleaning:",sum(is.na(df)))
+```
+
+
+```{r Check Summary of Data, echo=FALSE, warning=TRUE, message=FALSE}
+#summary(df)
+```
+
+
+
+### Are Democratic voters more enthusiastic about Joe Biden or Kamala Harris?
+
+## Importance and Context
+The context of understanding the difference in enthusiasm levels between Joe Biden and Kamala Harris would prove interesting, as one would expect that Joe Biden would have equal, if not higher, enthusiasm levels than Kamala Harris given that he was nominated for President. Furthermore, if the Vice-President has lower enthusiasm levels, then this could, theoretically, be used by political and campaign strategists on how to promote the President during election season. Also, if there is a difference in enthusiasm levels in favor of Kamala Harris, then it might suggest that Democratic voters would prefer to have her as President than Joe Biden.
+
+<!-- # Basic Summary on people's enthusiasm for Biden and that on Harris -->
+```{r echo=FALSE, warning=TRUE, message=FALSE}
+summary(df$enthusiasm_Biden)
+paste("Standard deviation of people's enthusiasm for Biden:",sd(df$enthusiasm_Biden))
+summary(df$enthusiasm_Harris)
+paste("Standard deviation of people's enthusiasm for harris:",sd(df$enthusiasm_Harris))
+# From the summary tables and the plot above, we can see that variables enthuasiam for Biden and  Harris both have values range from 0 to 100 and have around the same distrbution.
+```
+
+<!-- #Plot of Enthusiasm Score Distribution for Joe Biden and Kamala Harris -->
+```{r echo=FALSE, warning=TRUE, message=FALSE}
+d = data.frame(x = c(df$enthusiasm_Biden, df$enthusiasm_Harris), 
+               type=rep(c("Biden", "Harris"), c(length(df$enthusiasm_Biden), length(df$enthusiasm_Harris))))
+ggplot(d) + 
+  geom_density(aes(x=x, colour=type, fill=type), alpha=0.5) + ggtitle("Score Distribution of   Democratic Voters for Biden and Harris") + xlab("Score Range (0-100)") + ylab("Histogram Percentile")
+```
+  
+## Description of Data
+The only variables collected for analysis were the party designation for each respondent and their enthusiasm scores for both President Joe Biden and Vice-President Kamala Harris. The party designation is required to filter to just respondents that identified as a Democratic voter. The two enthusiasm scores are required to conduct the analysis as those scores will be compared to determine if Democratic voters are more enthusiastic about Joe Biden or Kamala Harris.
+  
+Data Distribution Features:  
+The distributions of enthusiasm scores for both Biden and Harris have a multi-modal distribution with three peaks. The middle peak centers around and enthusiasm score of 85 while the lower and upper peaks center around 70 and 100, respectively. The mean of Joe Biden's enthusiasm scores is 73.89 with a standard deviation of 23.48, with a 95% confidence interval of [26.93, 100]. The mean of Kamala Harris' enthusiasm scores 73.18 with a standard deviation of 25.06, with a 95% confidence interval of [23.06, 100]. The means for both enthusiasm scores are below the median, implying left-skew. 
+
+Data Wrangling:  
+We filtered out non-democratic voters, as for the research question we are only interested in democratic voters. Moreover, we see that the variables "enthusiasm_Biden" and "enthusiasm_Harris" in the data contain missing values, and we have removed those data to avoid unfair comparison. Furthermore, the enthusiasm scores of these two variables should range from 0 to 100, so values outside of this range should be removed. For example, score values of 998, 999, -4, and -9 are removed as those represent "Don't know", "Don't recognize", "Technical error", and "Refused", respectively; these four value do not provide accurate insights into differences in enthusiasm levels between Biden and Harris. Additionally, we rename the three variables we are interested in to reasonable names and rename the values in the "party_type" variable to "Democratic".
+  
+## Most appropriate test 
+We have determined that our data is metric, paired, and IID. The most appropiate test to use is the two-tailed Wilcoxon Signed-Rank Test, a non-parametric test to compare two related samples. 
+
+Here's the statement for our hypothesis testing
+Null Hypothesis: There is no difference in the mean enthusiasm scores between Joe Biden and Kamala Harris.
+Alternative Hypothesis: There is a difference in the mean enthusiasm scores between Joe Biden and Kamala Harris.
+alpha: 0.05
+
+Assumptions:  
+1) Metric data: the enthusiasm scores range from 0 to 100.  
+2) Paired data: a respondent provides a pair of scores, and therefore each respondent is in both groups: enthusiasm scores for Joe Biden and Kamala Harris.  
+3) Independent and Identically Distributed: each enthusiasm score has similar distributions to one another, and all these scores are independent to each other. The paired enthusiasm scores for one respondent should not have impact on the paired enthusiasm scores for another respondent.  
+4) Symmetric: although from the plot above we do not see symmetry, our sample size (1788) is large enough to apply CLT, and therefore this assumption is satisfied.  
+
+## Test, results and interpretation
+```{r}
+wilcox.test(df$enthusiasm_Biden, df$enthusiasm_Harris, alternative = 'two.sided', paired = TRUE)
+```
+
+Results:  
+From the Wilcoxon Signed-Rank test conducted, we obtain a P-Value of 0.1498, which is greater than our alpha (5% level of significance), indicating that we fail to reject the null hypothesis that there is no difference in the mean enthusiasm scores between Joe Biden and Kamala Harris. The results of this test indicate that Democratic voters are not more enthusiastic about either Joe Biden or Kamala Harris with statistical significance. 
+
+Practical Significance:  
+Because we fail to reject the null hypothesis, there is not a strong practical significance. Although we do not see a difference in voter's enthuasiasm between Biden and Harris, we can investigate other hypotheses with other candidates.
