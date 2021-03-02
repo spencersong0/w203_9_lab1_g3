@@ -1,0 +1,107 @@
+---
+title: 'Lab 1: Question 1'
+author: "Spencer Song, Spencer Hong, Andy Tertzakian, Kevin Xuan, Kevin Lu"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r load packages, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2) 
+library(tidyverse)
+library(foreign)
+library(moments)
+library(knitr)
+setwd("/Users/spencersong/Desktop/W203/anes_timeseries_spss")
+data <- read.spss("anes_timeseries_spss.sav")
+```
+
+```{r load and clean data, echo=FALSE, warning=TRUE, message=FALSE}
+#Q1 DATA WRANGLING
+df <- data
+df <- data.frame(df$V201507x, df$V201018)
+df <- rename(df, 
+  party_type = df.V201018,
+  voter_age = df.V201507x
+    )
+df <- subset(df, party_type == '1. Democratic party' | party_type == '2. Republican party')
+df$party_type_binary  <- ifelse(df$party_type == '1. Democratic party', 0, 1)
+df$voter_age <- substr(df$voter_age, start = 1, stop = 2)
+df$voter_age <- as.integer(df$voter_age)
+df <- subset(df, voter_age > 17)
+df$party_type <- as.character(df$party_type)
+df$party_type[df$party_type_binary == 1] <- "Republican"
+df$party_type[df$party_type_binary == 0] <- "Democratic"
+```
+
+
+## Importance and Context
+Demographics is an essential aspect of politics. Elections are decided by those who show up to vote, and age has historically one of the strongest inequalities that affects turnout and shifts voting. Understanding the age distributions of your party vs. another also helps political parties target their messages to their voter base using demographics.
+
+## Description of Data
+The research question raises the question whether a certain demographic is more inclined to stand with a certain party. The implications of answering such a question could result in a difference in election campaign methods during the election or long term strategy by the party to try to appeal to constituents who tend to switch parties as they age.
+
+Data Wrangling Modifications:
+The variables we used were from the affiliated party type and voter ages. We applied filters to remove any non-relevant data, such as refusals to answer. We also converted the party type to a binary data so it could more accurately be processed and allows us to use it as an operator when performing the subsequent tests.
+
+```{r echo=FALSE, warning=TRUE, message=FALSE}
+# tb <- data.frame(Party_Type = c(summary(subset(data$V201018, (data$V201018 == '1. Democratic party' | data$V201018 == '2. Republican party') & as.numeric(substr(data$V201507x,1,2)) > 17))))
+# 
+# tb2 <- data.frame(Party_Type_Binary = c(summary(df$party_type_binary)))
+# 
+# tb3 <- data.frame(Voter_Age = c(summary(df$voter_age)))
+# 
+# print(kable(tb))
+# print(kable(tb2))
+# print(kable(tb3))
+```
+
+Data Distribution Features (graphs shown below):
+The data shows two peaks around the 35 and 67 year mark with a noticeable drop around age 50 which likely points to the inclination to side with a party where the 35/67 peaks signifies they are generally more vocal regarding their political affiliation. We do however see that as an inflection point where the republican party support increases dramatically as the population ages past 50 years old. The data is also capped at 80 since the survey grouped all 80+ population at that level.
+
+```{r, echo = FALSE}
+#plot of age distributions of both parties data
+qplot(voter_age, data = df, geom = 'density', color = party_type, linetype = party_type) + ggtitle("Age Distribution of Voters in Democratic and Republican Parties") + xlab("Voter Age") + ylab("Histogram Percentile") + labs(fill = "Party Affiliation") + scale_color_manual(values=c("blue", "red"))
+#p
+```
+
+```{r, echo = FALSE}
+ggplot(df, aes(x=voter_age, y=party_type, color=party_type)) + geom_boxplot() + ggtitle("Age Distribution of Voters in Democratic and Republican Parties") + xlab("Voter Age") + ylab("Party Affiliation") + labs(fill = "Party Affiliation") + scale_color_manual(values=c("blue", "red"))
+```
+
+## Most appropriate test 
+The assumptions that we have validated for our data is that it is IID, metric, and unpaired. Given these assumptions, we decided to use a t-test for this research question. 
+
+Null Hypothesis: There is no difference in age between Republican and Democratic voters. 
+Alternative Hypothesis: There is a difference in age between Republican and Democratic voters. 
+Alpha: .05
+
+Assumptions and validation:
+1. Metric
+- Age is clearly a metric variable, even though party affiliation is ordinal. Our output is only concerned with age, so we meet this assumption of t-tests.
+2. IID data
+- Non-vote bias might be a concern, but this isn't necessarily a concern for IID, we just won't have a respondent population that is representative of all Americans. This hurts generalizability, but the t-test will still be valid regardless. The number of the sample size outweights the concern for lack of perfect independence between draws. We are fairly confident that the IID assumption is valid given our context.
+3. Not too unnormal considering the sample size
+- Our sample size of 3074, which is large enough for us to rely on the CLT.
+- The sample size has clear left skew and seems to be a two peak distribution, but these concerns are not enough to threaten the validity of a t-test. (Note: Skewness value: -0.2159421)
+4. Unpaired
+- Group identification is mutually exclusive in this test, therefore we have unpaired groups, as one person cannot be both a Republican and Democratic voter.
+
+## Test, results and interpretation
+```{r}
+t.test(df$voter_age ~ df$party_type)
+```
+Our t-test gives us a p-value of 1.017e_07 (much less than our alpha value), with a 95% confidence interval from [-4.531, -2.097] years of difference between the sample groups.
+
+Conclusion: We reject the null hypothesis that the true difference in means is equal to 0. We can say with 95% confidence that Democratic voters are approximately 2-4.5 years younger than Republican voters in 2020, so Democratic campaigns must consider how to appeal to their younger voter base. The mean age of a Republican voter is 3.314 years higher than the mean age in Democratic voters.
+
+Practical significance: We can say that Democrats should tailor their campaign to slightly younger voters than Republicans given our test results.
+
+
+
+
+
+
+
+
