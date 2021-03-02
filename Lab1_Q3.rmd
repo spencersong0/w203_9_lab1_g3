@@ -1,0 +1,222 @@
+---
+title: 'Lab 1: Question 3'
+author: "Spencer Song, Spencer Hong, Andy Tertzakian, Kevin Xuan, Kevin Lu"
+output: pdf_document
+---
+
+```{r load packages, echo=FALSE, warning=FALSE, message=FALSE}
+## Load packages
+library(dplyr)
+library(ggplot2) 
+library(tidyverse)
+library(foreign)
+library(viridis)
+library(scales)
+
+## Load data
+if (!exists("data")) {
+  print("Loading data for the first time...")
+  data <- read.spss("anes_timeseries_2020_spss_20210211.sav") # if you want more, but still core, toolkit
+}
+```
+
+```{r load and clean data, echo=FALSE, warning=TRUE, message=FALSE}
+## Select only the columns we're interested in
+df <- data.frame(data$V201145, data$V201624, data$V201146)
+
+## Rename the columns
+df <- rename(df, 
+  gov_approv = data.V201145,
+  gov_approv_strength = data.V201146,
+  pos_covid = data.V201624
+    ) 
+```
+
+```{r data extraction: COVID, echo=FALSE, warning=FALSE, message=FALSE}
+## Data Cleaning & Organizing
+## Extract data for whether or not a household has contracted COVID
+
+## Filter for only rows that have a certain covid outcome (i.e. No )
+df <- subset(df, pos_covid == '1. Someone in my household tested positive' | pos_covid == '2. No one tested positive')
+
+## Change variable "covid_19" to a binary representation: 0 (negative) and 1 (positive)
+df$pos_covid_binary  <- ifelse(df$pos_covid == '1. Someone in my household tested positive', 1, 0)
+
+## Rename values under "pos_covid" to "Positive" and "Negative"
+df$pos_covid <- as.character(df$pos_covid)
+df$pos_covid[df$pos_covid_binary == 0] <- "COVID19 Negative"
+df$pos_covid[df$pos_covid_binary == 1] <- "COVID19 Positive"
+```
+
+```{r Further Data Extraction: approval, echo=FALSE, warning=FALSE, message=FALSE}
+##Extract data for whether or not the respondent approves of their governor's handling of COVID19
+
+## Remove responses from the dataset that aren't clearly approving/dissapproving
+df <- subset(df,gov_approv == '1. Approve' | gov_approv == '2. Disapprove')
+
+## Change variable "approval" to a binary representation: 0 (Disapproval) and 1 (Approval)
+df$gov_approv_binary  <- ifelse(df$gov_approv == '1. Approve', 1, 0)
+
+## $ename values under "gov_approval" to "Approve" and "Disapprove"
+df$gov_approv <- as.character(df$gov_approv)
+df$gov_approv[df$gov_approv_binary == 0] <- "Disapprove"
+df$gov_approv[df$gov_approv_binary == 1] <- "Approve"
+```
+
+```{r Further Data Extraction: approval strength, echo=FALSE, warning=FALSE, message=FALSE}
+
+## Remove responses from the dataset that aren't clearly approving/dissapproving
+df <- subset(df, gov_approv_strength == '1. Strongly' | gov_approv_strength == '2. Not strongly')
+
+## Change variable "approval" to a binary representation: 0 (Disapproval) and 1 (Approval)
+df$gov_approv_strength_binary  <- ifelse(df$gov_approv_strength == '1. Strongly', 1, 0)
+
+## Rename values under "gov_approval" to "Approve" and "Disapprove"
+df$gov_approv_strength <- as.character(df$gov_approv_strength)
+df$gov_approv_strength[df$gov_approv_strength_binary == 0] <- "Not Strongly"
+df$gov_approv_strength[df$gov_approv_strength_binary == 1] <- "Strongly"
+
+##  Concatenate their opinion with their associated strength into a new column
+df$gov_approv_w_strength <- paste(df$gov_approv,  "-", df$gov_approv_strength)
+```
+
+```{r Initial Data Exploration, echo=FALSE, warning=FALSE, message=FALSE}
+
+## Here we will perform some simple exploratory data analysis in order to understand the basic spread of respondents.
+
+## Count the total number of people with, and without housemates who have come down with COVID19
+sum_no_covid = sum(df$pos_covid_binary == 0)
+sum_covid = sum(df$pos_covid_binary == 1)
+# paste("Total number of people where their house has no COVID19: ",sum_no_covid) #7854
+# paste("Total number of people where their house has COVID19: ", sum_covid) #284
+# paste("Percentage of people who have no COVID19 in their house:",round(sum_no_covid/(sum_no_covid+sum_covid),4)*100,'%')
+
+## Partition the dataset to those with, and without COVID19 within their households
+without_covid <- subset(df, pos_covid_binary == 0)
+with_covid <- subset(df, pos_covid_binary == 1)
+
+## Number of people who have NO COVID19 in their house, and who also DISAPPROVE of their Governor
+sum_no_covid_disapproves <- sum(without_covid$gov_approv_binary == 0) #2978
+
+## Number of people who have NO COVID19 in their house, and who also APPROVE of their Governor
+sum_no_covid_approves <- sum(without_covid$gov_approv_binary == 1) #4876
+
+## Number of people who have COVID19 in their house, and who also DISAPPROVE of their Governor
+sum_covid_approves <- sum(with_covid$gov_approv_binary == 0) #125
+
+## Number of people who have COVID19 in their house, and who also APPROVE of their Governor
+sum_covid_dissapproves <-sum(with_covid$gov_approv_binary == 1) #159
+
+## Findings of interest
+# paste('For people with their no COVID19 in their house,',round(sum_no_covid_disapproves / (sum_no_covid_disapproves+sum_no_covid_approves),4)*100,'% disapproves')
+# paste('For people with at least COVID19 case in their house,',round(sum_covid_approves/ (sum_covid_approves + sum_covid_dissapproves),4)*100,'% disapproves')
+```
+
+## Importance and Context
+In many cases, people tend to blame others for wrongdoings. We want to check out that if a person - who has family members and/or housemates that are infected with COVID19 - is more likely going to express disapproval for their Governor's action towards 
+preventing further spread of the current pandemic. This could theoretically contribute towards explaining the trend of a given Governor's popularity as the COVID19 spreads more broadly through their state, or vice versa.
+
+## Description of Data
+For the data, we identified the two important variables that can answer our research question: housemates getting COVID19 or not, and whether or not that same respondent approves or not of their Governor's reseponse to COVID19. The question at hand is
+asking whether or not individuals who have had a housemate contract COVID19 are more likely to disapprove of their Governors; these two variables are directly related. Though we investigated another variable which measured how strong the respondent's conviction
+was for their response to their approval/disapproval of their Governor's COVID19 actions, we opted not to include this variale as we determined it did not add any value to answering the question. A subsequent study/research question could be answered using this data.
+
+### Data Wrangling
+For variable "pos_covid", which represents whether or not the given respondent had experienced a housemate contract COVID19, we ommited responses which did not directly indicate whether or not they indeed did have a housemate contract COVID19. Simiarly, for
+the variable "approval", we kept only data which had directly indicated that the respondent either disapproved or approved of their Governor's COVID19 actions. By doing this, we remove irrelevant, or inconclusive/ambiguous, data. Subsequently, since for each 
+variable we are left with two values, we transform those values to dummy values (0 and 1) so that we can conduct the test. Again, we decided to exclue the data which described the strength of the respondent's opinion towards their Governor. We consided this 
+"ambiguous" data as it relates to the question at hand.
+
+### Data Distribution Features
+From some of exploratory findings above, we saw that 96% of respondents have yet to have a housemate contract COVID19. This is expected, as currently there are only 2.8 million out of 331 million (0.8% of the population) who have tested positive for COVID19.
+We also saw from the data that, of people who had a housemate contract COVID19, 44% expressed disapproval against their Governor. For respondents who had no housemates with COVID19, approximately 38% expressed the same disapproval for their Governor. Here, we 
+see a 6% difference in the percent disapproval for Governors COVID19 response actions. Finally, a further finding we saw, which will not play a critical role in this investigation, was that respondents overall felt strongly more than "not strongly" when came 
+to their approval/disapproval for their Governor in the face of the Coronavirus Pandemic. Again, though not critical for this exercise, this may indicate that the COVID19 issue is one that touches citizens on a personal level (perhaps unsurprising).
+
+\newpage
+
+```{r Figure 1, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
+## Let's chart these two groups and their corresponding Govervnor COVID19 approval rates.
+ggplot(data=df, aes(x=gov_approv, y=..count.., group=gov_approv,  fill=gov_approv)) +
+  geom_bar(position="dodge") +
+  facet_wrap(~pos_covid, scales="free") +
+  ggtitle("Approval for Governor Response\nto COVID19 by COVID19 Household Infection Status") +
+  xlab("Governor COVID19 Response Approval (Approve/Disapprove)") +
+  ylab("Count (#)") +
+  labs(fill = "Governor\nCOVID19\nResponse\nApproval") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r Figure 2, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
+# ggplot(data=df, aes(x=gov_approv_w_strength, y=..count.., group=gov_approv,  fill=gov_approv)) +
+#   geom_bar(position="dodge") +
+#   facet_wrap(~pos_covid, scales="free") +
+#   ggtitle("Approval Sentiment for Governor Response\nto COVID19 by COVID19 Household Infection Status") +
+#   xlab("Governor COVID19 Response Approval Sentiment") +
+#   ylab("Count (#)") +
+#   labs(fill = "Governor\nCOVID19\nResponse\nApproval") +
+#   theme(plot.title = element_text(hjust = 0.5), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+```{r Figure 3, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10, fig.height=5}
+ggplot(data=df, aes(x=gov_approv, y=..prop.., group=pos_covid)) +
+  geom_bar(position="dodge") +
+  ylim(0,1) +
+  facet_wrap(~pos_covid, scales="free") +
+  ggtitle("Percent Approval for Governor Response\nto COVID19 by COVID19 Household Infection Status") +
+  xlab("Governor COVID19 Response Approval (Approve/Disapprove)") +
+  ylab("Percent (%)") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r Figure 4, echo=FALSE, warning=FALSE, message=FALSE}
+# ggplot(data=df, aes(x=gov_approv_w_strength, y=..prop.., group=pos_covid)) +
+#   geom_bar(position="dodge") +
+#   ylim(0,1) +
+#   facet_wrap(~pos_covid, scales="free") +
+#   ggtitle("Percent Approval Sentiment for Governor Response\nto COVID19 by COVID19 Household Infection Status") +
+#   xlab("Governor COVID19 Response Approval Sentiment") +
+#   ylab("Percent (%)") +
+#   theme(plot.title = element_text(hjust = 0.5), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+
+## Most appropriate test 
+Given these circumstances, the most appropiate test is the two-tail Wilcoxon Rank-Sum Test, a non-parametric test to compare two unrelated samples. We can also conduct one-tailed test since our 
+research question is to see whether respondents who have
+had someone in their home infected are more likely to disapprove, which implies a direction to the approval. However, to avoid the case where we receive unexpected results, we will still conduct
+ a two-tailed test.
+
+Since you cannot have both no housemates with COVID19 and at least 1 housemate with COVID19 at the same time, we have unpaired data. From the research question, we want to compare diaspproval
+ of the respondent's Governor's handling of the pandemic, so our interested outcome is the variable "approval/disapproval" of the 
+governor". Since this variable is a string type which has the value of either "approve" or "disapprove", the variable is ordinal. 
+
+### Hypothesis
+Our hypothesis is formulated as follows:
+
+ - Null Hypothesis: The mean approval rating for a Governor's COVID19 response for those with and without the Coronavirus in their household is this the same.
+ - Alternative Hypothesis: The mean approval rating for a Governor's COVID19 response for those with and without the Coronavirus in their household is this the *different*.
+ - Significance Level: We will select an $\alpha$ value of 0.05
+
+### Assumptions 
+Here are our assumptions for the test we are about to perform:
+
+  1. Ordinal variable: disapproval or approval
+  2. IID: every response has a similar distribution, and they are mutually independent of each other.
+  3. Unpaired: People who have housemates with COVID19 *versus* People who have no housemates with COVID19
+
+## Test, Results and Interpretation
+
+We will now run our test using R:
+```{r Test}
+## Perform the test for our hypothesis test
+wilcox.test(df$gov_approv_binary ~ df$pos_covid_binary, paired=FALSE, mu=0, conf.level = 0.95, alternative="two.sided")
+```
+From the Wilcoxon Rank-Sum test conducted, we obtain a P-Value of 0.03887, which is smaller than 0.05 (5% level of significance), which indicates that we reject the null hypothesis. This implies that,
+ with a 95% confidence, there *IS* a difference in the 
+amount of disapproval for the Governor's response to COVID19 between households that contracted the virus, and those that did not.
+
+### Conclusion & Practical Significance
+With statistical significance, there is a difference between Governor COVID19 response approval rates for those who have house members with COVID19, and those who do not. This indicates that contracting
+ COVID19 within one's house tends to sour one's sentiment towards 
+their state government. One explanation for this is that these individuals blame their Governor for not doing enough to stop the Coronavirus from penetrating their household. That is, if the Governor 
+had done more, they potentientially would not have had 
+Coronavirus in their house to begin with.
